@@ -3,16 +3,17 @@
 
 #define MOTOR_ADDRESS 0x141 //0x140 + ID(1~32)
 #define BAUDRATE 115200     //シリアル通信がボトルネックにならないよう，速めに設定しておく
-#define LOOPTIME 5
+#define LOOPTIME 5  //[ms]
 #define TEXTSIZE 1
 
-int pos = 300;
+int pos = 600;
 unsigned char len = 0;
 unsigned char cmd_buf[8], reply_buf[8];
 unsigned long timer[3];
+byte pos_byte[4];
 
 /* variable for CAN */
-byte data[8] = {0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+byte data[8] = {0xA3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 long unsigned int rxId;
 unsigned char rxBuf[8];
 char msgString[128];
@@ -29,25 +30,42 @@ void setup()
   M5.begin();
   M5.Power.begin();
   Serial.begin(BAUDRATE);
-  // Serial2.begin(BAUDRATE, SERIAL_8N1, 16, 17);
   delay(1000);
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(GREEN, BLACK);
   M5.Lcd.setTextSize(TEXTSIZE);
 
+  pos_byte[0] = pos & 0xFF;
+  pos_byte[1] = (pos >> 8) & 0xFF;
+  pos_byte[2] = (pos >> 16) & 0xFF;
+  pos_byte[3] = (pos >> 24) & 0xFF;
+  for (int i = 0; i < 4; i++)
+  {
+    // sprintf(msgString, " 0x%.2X", pos_byte[i]);
+    Serial.print(pos_byte[i]);
+    M5.Lcd.printf("0x%.2X ", pos_byte[i]);
+  }
+  Serial.println();
+  M5.Lcd.printf("\n");
+
+  data[4] = pos_byte[0];
+  data[5] = pos_byte[1];
+  data[6] = pos_byte[2];
+  data[7] = pos_byte[3];
+
   init_can();
-  Serial.println("Test CAN...");
+  Serial.println("Test CAN...\n");
   timer[0] = millis();
 }
 
 void loop()
 {
-  if (M5.BtnA.wasPressed())
-  {
-    M5.Lcd.clear();
-    M5.Lcd.printf("CAN Test B!\n");
-    init_can();
-  }
+  // if (M5.BtnA.wasPressed())
+  // {
+  //   M5.Lcd.clear();
+  //   M5.Lcd.printf("CAN Test B!\n");
+  //   init_can();
+  // }
   write_can();
   read_can();
   M5.update();
@@ -79,7 +97,7 @@ void init_can()
 void write_can()
 {
   // send data:  ID = 0x100, Standard CAN Frame, Data length = 8 bytes, 'data' = array of data bytes to send
-  byte sndStat = CAN0.sendMsgBuf(0x100, 0, 8, data);
+  byte sndStat = CAN0.sendMsgBuf(MOTOR_ADDRESS, 0, 8, data);
   if (sndStat == CAN_OK)
   {
     Serial.println("Message Sent Successfully!");
@@ -101,11 +119,11 @@ void read_can()
 
     if ((rxId & 0x80000000) == 0x80000000) // Determine if ID is standard (11 bits) or extended (29 bits)
     {
-      sprintf(msgString, "Extended ID: 0x%.8lX  DLC: %1d  Data:", (rxId & 0x1FFFFFFF), len);
+      sprintf(msgString, "Extended ID: 0x%.8lX  DLC: %1d \n Data:", (rxId & 0x1FFFFFFF), len);
     }
     else
     {
-      sprintf(msgString, "Standard ID: 0x%.3lX       DLC: %1d  Data:", rxId, len);
+      sprintf(msgString, "Standard ID: 0x%.3lX       DLC: %1d \n Data:", rxId, len);
     }
 
     Serial.print(msgString);
