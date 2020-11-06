@@ -6,14 +6,24 @@
 #define LOOPTIME 5  //[ms]
 #define TEXTSIZE 1
 
-int pos = 600;
+int pos = 0;
 unsigned char len = 0;
 unsigned char cmd_buf[8], reply_buf[8];
 unsigned long timer[3];
 byte pos_byte[4];
 
 /* variable for CAN */
-byte data[8] = {
+byte pidData[8] = {
+  0x31,
+  0x00,
+  0x19, /* pos_KP */
+  0x00, /* pos_KI */
+  0x00, /* vel_KP */
+  0x00, /* vel_KI */
+  0x00, /* cur_KP */
+  0x00  /* cur_KI */
+};
+byte posdata[8] = {
   0xA3,
   0x00,
   0x00,
@@ -31,7 +41,8 @@ char msgString[128];
 MCP_CAN_M5 CAN0(12); // Set CS to pin 10
 
 void init_can();
-void write_can();
+void write_pos();
+void write_PID();
 void read_can();
 
 void setup()
@@ -57,10 +68,10 @@ void setup()
   Serial.println();
   M5.Lcd.printf("\n");
 
-  data[4] = pos_byte[0];
-  data[5] = pos_byte[1];
-  data[6] = pos_byte[2];
-  data[7] = pos_byte[3];
+  posdata[4] = pos_byte[0];
+  posdata[5] = pos_byte[1];
+  posdata[6] = pos_byte[2];
+  posdata[7] = pos_byte[3];
 
   init_can();
   Serial.println("Test CAN...\n");
@@ -76,7 +87,7 @@ void loop()
   //   M5.Lcd.printf("CAN Test B!\n");
   //   init_can();
   // }
-  write_can();
+  write_pos();
   read_can();
   M5.update();
   timer[1] = millis();
@@ -104,10 +115,27 @@ void init_can()
   CAN0.setMode(MCP_NORMAL); // Change to normal mode to allow messages to be transmitted
 }
 
-void write_can()
+void write_pos()
 {
   // send data:  ID = 0x100, Standard CAN Frame, Data length = 8 bytes, 'data' = array of data bytes to send
-  byte sndStat = CAN0.sendMsgBuf(MOTOR_ADDRESS, 0, 8, data);
+  byte sndStat = CAN0.sendMsgBuf(MOTOR_ADDRESS, 0, 8, posdata);
+  if (sndStat == CAN_OK)
+  {
+    Serial.println("Message Sent Successfully!");
+    M5.Lcd.printf("Message Sent Successfully!\n");
+  }
+  else
+  {
+    Serial.println("Error Sending Message...");
+    M5.Lcd.printf("Error Sending Message...\n");
+  }
+  delay(200); // send data per 200ms
+}
+
+void write_PID()
+{
+  // send data:  ID = 0x100, Standard CAN Frame, Data length = 8 bytes, 'data' = array of data bytes to send
+  byte sndStat = CAN0.sendMsgBuf(MOTOR_ADDRESS, 0, 8, pidData);
   if (sndStat == CAN_OK)
   {
     Serial.println("Message Sent Successfully!");

@@ -12,8 +12,8 @@
 #endif
 
 #define BAUDRATE 115200 //シリアル通信がボトルネックにならないよう，速めに設定しておく
-#define LOOPTIME 10 //[ms]
-#define ENDTIME 10000 //[ms]
+#define LOOPTIME 10     //[ms]
+#define ENDTIME 10000   //[ms]
 #define TEXTSIZE 2
 
 unsigned char len = 0;
@@ -27,12 +27,12 @@ byte pos_byte[4];
 const uint16_t MOTOR_ADDRESS = 0x141; //0x140 + ID(1~32)
 const int SPI_CS_PIN = 12;
 
-#define CAN0_INT 15  // Set INT to pin 2
+#define CAN0_INT 15          // Set INT to pin 2
 MCP_CAN_M5 CAN0(SPI_CS_PIN); // Set CS to pin 10
 
 int A = 30 * 6 * 100; // [servoHornDeg]*[gearRatio]*[encorderResolution]
-double f =1.0; //[Hz]
-double omega = 2*3.14*f;
+double f = 1.0;       //[Hz]
+double omega = 2 * 3.14 * f;
 
 void init_can();
 void write_can();
@@ -63,10 +63,10 @@ void loop()
     // M5.Lcd.clear();
 
     // position control command
-    cmd_buf[0] = 0xA3;
+    cmd_buf[0] = 0xA4;
     cmd_buf[1] = 0x00;
     cmd_buf[2] = 0x00;
-    cmd_buf[3] = 0x00;
+    cmd_buf[3] = 0x10;
     cmd_buf[4] = tgt_pos & 0xFF;
     cmd_buf[5] = (tgt_pos >> 8) & 0xFF;
     cmd_buf[6] = (tgt_pos >> 16) & 0xFF;
@@ -99,7 +99,7 @@ void loop()
     //   present_pos = present_pos + (reply_buf[i+1] << (8*i));
     // }
     present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 48);
-    present_pos = present_pos*0.01/6;
+    present_pos = present_pos * 0.01 / 6;
 
     // byteならこっち
     // serialDisp(rmd.reply_buf, rmd.pos_buf);
@@ -109,15 +109,15 @@ void loop()
     // SERIAL.print(present_pos);
     int tgt_angle = tgt_pos * 0.01 / 6;
     M5.Lcd.setCursor(0, 40);
-    M5.Lcd.printf("TIM:        ");
+    M5.Lcd.printf("TIM:            ");
     M5.Lcd.setCursor(0, 40);
-    M5.Lcd.printf("TIM: %d", timer[1]-timer[0]);
+    M5.Lcd.printf("TIM: %d", timer[1] - timer[0]);
     M5.Lcd.setCursor(0, 70);
-    M5.Lcd.printf("TGT:        ");
+    M5.Lcd.printf("TGT:            ");
     M5.Lcd.setCursor(0, 70);
     M5.Lcd.printf("TGT: %d", tgt_angle);
     M5.Lcd.setCursor(0, 100);
-    M5.Lcd.printf("POS:        ");
+    M5.Lcd.printf("POS:            ");
     M5.Lcd.setCursor(0, 100);
     M5.Lcd.printf("POS: %d", present_pos);
 
@@ -132,7 +132,6 @@ void loop()
     {
       // M5.Lcd.printf("TIME SHORTAGE: %d\n", LOOPTIME - timer[2]);
     }
-
   }
 
   // stop command
@@ -231,37 +230,37 @@ void read_can()
 
 void serialDisp(unsigned char *buf, unsigned char *pos_buf)
 {
-    // Serial Communication
-    SERIAL.print(",");
-    SERIAL.print(buf[0]);
-    SERIAL.print(",");
-    SERIAL.print(buf[1]);
-    SERIAL.print(",");
-    SERIAL.print(buf[2]);
-    SERIAL.print(",");
-    SERIAL.print(buf[3]);
-    SERIAL.print(",");
-    SERIAL.print(buf[4]);
-    SERIAL.print(",");
-    SERIAL.print(buf[5]);
-    SERIAL.print(",");
-    SERIAL.print(buf[6]);
-    SERIAL.print(",");
-    SERIAL.print(buf[7]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[0]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[1]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[2]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[3]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[4]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[5]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[6]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[7]);
+  // Serial Communication
+  SERIAL.print(",");
+  SERIAL.print(buf[0]);
+  SERIAL.print(",");
+  SERIAL.print(buf[1]);
+  SERIAL.print(",");
+  SERIAL.print(buf[2]);
+  SERIAL.print(",");
+  SERIAL.print(buf[3]);
+  SERIAL.print(",");
+  SERIAL.print(buf[4]);
+  SERIAL.print(",");
+  SERIAL.print(buf[5]);
+  SERIAL.print(",");
+  SERIAL.print(buf[6]);
+  SERIAL.print(",");
+  SERIAL.print(buf[7]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[0]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[1]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[2]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[3]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[4]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[5]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[6]);
+  SERIAL.print(",");
+  SERIAL.print(pos_buf[7]);
 }
