@@ -6,7 +6,7 @@
 #define LOOPTIME 5  //[ms]
 #define TEXTSIZE 1
 
-int pos = 600;
+int pos =0;
 unsigned char len = 0;
 unsigned char cmd_buf[8], reply_buf[8];
 unsigned long timer[3];
@@ -64,7 +64,6 @@ void setup()
 
   init_can();
   Serial.println("Test CAN...\n");
-  write_PID();
   timer[0] = millis();
 }
 
