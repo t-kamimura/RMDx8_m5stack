@@ -111,7 +111,7 @@ void loop()
         // {
         //   present_pos = present_pos + (reply_buf[i+1] << (8*i));
         // }
-        present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 48);
+        present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 40) + (reply_buf[7] << 48);
         present_pos = present_pos * 0.01 / 6;
         vel = (present_pos - pos_buf)/(LOOPTIME*0.001);
 
