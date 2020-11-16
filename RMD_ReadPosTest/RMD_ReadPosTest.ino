@@ -81,6 +81,7 @@ void loop()
         cmd_buf[6] = 0x00;
         cmd_buf[7] = 0x00;
         write_can();
+        delay(1);
         read_can();
 
         M5.update();
@@ -95,13 +96,7 @@ void loop()
         int32_t horn_pos = present_pos * 0.01 / 6;
         vel = (present_pos - pos_buf)/(LOOPTIME*0.01);
 
-        // byteならこっち
-        // serialDisp(rmd.reply_buf, rmd.pos_buf);
-
-        // 10進数ならこっち
-        // SERIAL.print(",");
-        // SERIAL.print(present_pos);
-        // int tgt_angle = tgt_pos * 0.01 / 6;
+        // DEBUG(この処理重いので注意)
         M5.Lcd.setCursor(0, 40);
         M5.Lcd.printf("TIM:            ");
         M5.Lcd.setCursor(0, 40);
@@ -119,8 +114,6 @@ void loop()
         M5.Lcd.setCursor(0, 130);
         M5.Lcd.printf("VEL: %d", vel);
 
-        // rmd.serialWriteTerminator();
-
         timer[2] = millis() - timer[1];
         if (timer[2] < LOOPTIME)
         {
@@ -128,6 +121,8 @@ void loop()
         }
         else
         {
+            SERIAL.print("TIME SHORTAGE");
+            SERIAL.println(LOOPTIME - timer[2]);
             // M5.Lcd.printf("TIME SHORTAGE: %d\n", LOOPTIME - timer[2]);
         }
     }
@@ -224,41 +219,4 @@ void read_can()
         // M5.Lcd.printf("\n");
         Serial.println();
     }
-}
-
-void serialDisp(unsigned char *buf, unsigned char *pos_buf)
-{
-    // Serial Communication
-    SERIAL.print(",");
-    SERIAL.print(buf[0]);
-    SERIAL.print(",");
-    SERIAL.print(buf[1]);
-    SERIAL.print(",");
-    SERIAL.print(buf[2]);
-    SERIAL.print(",");
-    SERIAL.print(buf[3]);
-    SERIAL.print(",");
-    SERIAL.print(buf[4]);
-    SERIAL.print(",");
-    SERIAL.print(buf[5]);
-    SERIAL.print(",");
-    SERIAL.print(buf[6]);
-    SERIAL.print(",");
-    SERIAL.print(buf[7]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[0]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[1]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[2]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[3]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[4]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[5]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[6]);
-    SERIAL.print(",");
-    SERIAL.print(pos_buf[7]);
 }
