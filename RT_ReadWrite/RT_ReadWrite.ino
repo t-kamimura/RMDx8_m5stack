@@ -32,21 +32,27 @@ const int SPI_CS_PIN = 12;
 #define CAN0_INT 15          // Set INT to pin 2
 MCP_CAN_M5 CAN0(SPI_CS_PIN); // Set CS to pin 10
 
-int A = 30 * 6 * 100; // [servoHornDeg]*[gearRatio]*[encorderResolution]
-double f = 1.0;       //[Hz]
-double omega = 2 * 3.14 * f;
-int64_t present_pos = 0;
+// variables for controller
+const int A = 30 * 6 * 100; // [servoHornDeg]*[gearRatio]*[encorderResolution]
+const double f = 1.0;       //[Hz]
+const double omega = 2 * 3.14 * f;
 int32_t tgt_pos = 0;
+
+int64_t present_pos = 0;
+int32_t pos_old = 0;
 int32_t vel = 0;
-int32_t pos_buf = 0;
 
 // define functions
 void init_can();
 void write_can();
 void read_can();
+
 // define two tasks
 void TaskReadWrite(void *pvParameters);
 void TaskDataProcess(void *pvParameters);
+
+// variables for task communication
+QueueHandle_t xQueue;
 
 // the setup function runs once when you press reset or power the board
 void setup()
@@ -64,28 +70,25 @@ void setup()
     M5.Lcd.printf("RTOS Test!\n");
     timer[0] = millis();
 
-    // Now set up two tasks to run independently.
-    xTaskCreateUniversal(
-        TaskReadWrite,
-        "TaskReadWrite" // A name just for humans
-        ,
-        1024 // This stack size can be checked & adjusted by reading the Stack Highwater
-        ,
-        NULL,
-        2 // Priority, with 3 (configMAX_PRIORITIES - 1) being the highest, and 0 being the lowest.
-        ,
-        NULL, ARDUINO_RUNNING_CORE);
 
-    xTaskCreateUniversal(
-        TaskDataProcess,
-        "TaskDataProcess",
-        1024 // Stack size
-        ,
-        NULL,
-        1 // Priority
-        ,
-        NULL,
-        ARDUINO_RUNNING_CORE);
+    // create queue : type = int32_t, size = 5
+     xQueue = xQueueCreate(5, sizeof(int32_t));
+
+     if(xQueue != NULL)
+     {
+        // Now set up two tasks to run independently.
+        xTaskCreateUniversal(TaskReadWrite, "TaskReadWrite", 1024, NULL, 2, NULL, ARDUINO_RUNNING_CORE);
+        xTaskCreateUniversal(TaskDataProcess, "TaskDataProcess", 1024, NULL, 1, NULL, ARDUINO_RUNNING_CORE);
+         Serial.println("tasks registered");
+     }
+     else
+     {
+         while(1)
+         {
+             Serial.println("rtos queue create error, stopped");
+             delay(1000);
+         }
+     }
 
     // Now the task scheduler, which takes over control of scheduling individual tasks, is automatically started.
 }
@@ -108,6 +111,9 @@ void TaskReadWrite(void *pvParameters) // This is a task.
         while (millis() - timer[0] < ENDTIME)
         {
             timer[1] = millis();
+
+            BaseType_t xStatus;
+
             tgt_pos = A * sin(omega * (timer[1] - timer[0]) * 0.001);
 
             // M5.Lcd.clear();
@@ -123,11 +129,6 @@ void TaskReadWrite(void *pvParameters) // This is a task.
             cmd_buf[7] = (tgt_pos >> 24) & 0xFF;
             write_can();
 
-            // // print
-            // SERIAL.print(timer[1] - timer[0]);
-            // SERIAL.print(",");
-            // SERIAL.print(tgt_pos);
-
             // read multi turn angle
             cmd_buf[0] = 0x92;
             cmd_buf[1] = 0x00;
@@ -141,7 +142,20 @@ void TaskReadWrite(void *pvParameters) // This is a task.
             read_can();
 
             // M5.update();
-            // rmd.serialWriteTerminator();
+            int64_t SendValue;
+            // SendValue = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 40) + (reply_buf[7] << 48);
+            SendValue = 1;
+
+            xStatus = xQueueSend(xQueue, &SendValue, 0);    // キューを送信
+
+            // if(xStatus != pdPASS) // send error check
+            // {
+            //     while(1)
+            //     {
+            //         Serial.println("rtos queue send error, stopped");
+            //         delay(1000);
+            //     }
+            // }
 
             timer[2] = millis() - timer[1];
             if (timer[2] < LOOPTIME)
@@ -183,27 +197,53 @@ void TaskDataProcess(void *pvParameters) // This is a task.
     while (1) // A Task shall never return or exit.
     {
         M5.update();
+        BaseType_t xStatus;
+        int32_t ReceivedValue = 0;
+        const TickType_t xTicksToWait = 500U; // [ms]
 
-        present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 40) + (reply_buf[7] << 48);
-        present_pos = present_pos * 0.01 / 6;
-        vel = (present_pos - pos_buf) / (LOOPTIME * 0.001);
+        xStatus = xQueueReceive(xQueue, &ReceivedValue, xTicksToWait);
 
-        // M5.Lcd.setCursor(0, 40);
-        // M5.Lcd.printf("TIM:            ");
-        // M5.Lcd.setCursor(0, 40);
-        // M5.Lcd.printf("TIM: %d", timer[1] - timer[0]);
-        // M5.Lcd.setCursor(0, 70);
-        // M5.Lcd.printf("TGT:            ");
-        // M5.Lcd.setCursor(0, 70);
-        // M5.Lcd.printf("TGT: %d", tgt_pos);
-        // M5.Lcd.setCursor(0, 100);
-        // M5.Lcd.printf("POS:            ");
-        // M5.Lcd.setCursor(0, 100);
-        // M5.Lcd.printf("POS: %d", present_pos);
-        // M5.Lcd.setCursor(0, 130);
-        // M5.Lcd.printf("VEL:            ");
-        // M5.Lcd.setCursor(0, 130);
-        // M5.Lcd.printf("VEL: %d", vel);
+         Serial.println("check if data is received");
+
+         if(xStatus == pdPASS) // receive error check
+         {
+             Serial.print("received data : ");
+             Serial.println(ReceivedValue);
+            //  present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 40) + (reply_buf[7] << 48);
+            //  present_pos = ReceivedValue[1] + (ReceivedValue[2] << 8) + (ReceivedValue[3] << 16) + (ReceivedValue[4] << 24) + (ReceivedValue[5] << 32) + (ReceivedValue[6] << 40) + (ReceivedValue[7] << 48);
+            present_pos = 0;
+            present_pos = present_pos * 0.01 / 6;
+            vel = (present_pos - pos_old) / (LOOPTIME * 0.001);
+
+            // M5.Lcd.setCursor(0, 40);
+            // M5.Lcd.printf("TIM:            ");
+            // // M5.Lcd.setCursor(0, 40);
+            // // M5.Lcd.printf("TIM: %d", timer[1] - timer[0]);
+            // M5.Lcd.setCursor(0, 70);
+            // M5.Lcd.printf("TGT:            ");
+            // // M5.Lcd.setCursor(0, 70);
+            // // M5.Lcd.printf("TGT: %d", tgt_pos);
+            // M5.Lcd.setCursor(0, 100);
+            // M5.Lcd.printf("POS:            ");
+            // M5.Lcd.setCursor(0, 100);
+            // M5.Lcd.printf("POS: %d", present_pos);
+            // M5.Lcd.setCursor(0, 130);
+            // M5.Lcd.printf("VEL:            ");
+            // M5.Lcd.setCursor(0, 130);
+            // M5.Lcd.printf("VEL: %d", vel);
+         }
+         else
+         {
+             if(uxQueueMessagesWaiting(xQueue) != 0)
+             {
+                 while(1)
+                 {
+                     Serial.println("rtos queue receive error, stopped");
+                     delay(1000);
+                 }
+             }
+         }
+
         vTaskDelay(1);
     }
 }
