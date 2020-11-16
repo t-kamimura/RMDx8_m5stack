@@ -16,12 +16,12 @@ byte pos_byte[4];
 byte pidData[8] = {
   0x31,
   0x00,
-  0x19, /* pos_KP */
+  0x0F, /* pos_KP */
   0x00, /* pos_KI */
-  0x00, /* vel_KP */
+  0x01, /* vel_KP */
   0x00, /* vel_KI */
-  0x00, /* cur_KP */
-  0x00  /* cur_KI */
+  0x32, /* cur_KP */
+  0x32  /* cur_KI */
 };
 byte posdata[8] = {
   0xA3,

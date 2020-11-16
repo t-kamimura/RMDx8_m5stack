@@ -2,6 +2,7 @@
 #include <M5Stack.h>
 #include <mcp_can_m5.h>
 #include <SPI.h>
+//#include <RMDx8Arduino.h>
 
 /*SAMD core*/
 #ifdef ARDUINO_SAMD_VARIANT_COMPLIANCE
@@ -11,11 +12,11 @@
 #endif
 
 #define BAUDRATE 115200 //シリアル通信がボトルネックにならないよう，速めに設定しておく
-#define LOOPTIME 5     //[ms]
+#define LOOPTIME 10     //[ms]
 #define ENDTIME 10000   //[ms]
 #define TEXTSIZE 2
-#define KP 5.0
-#define KD 1.5
+#define KP 0.5
+#define KD 0.2
 #define TGT_POS 0
 
 unsigned char len = 0;
@@ -32,13 +33,12 @@ const int SPI_CS_PIN = 12;
 #define CAN0_INT 15          // Set INT to pin 2
 MCP_CAN_M5 CAN0(SPI_CS_PIN); // Set CS to pin 10
 
-//int A = 30 * 6 * 100; // [servoHornDeg]*[gearRatio]*[encorderResolution]
-//double f = 1.0;       //[Hz]
-//double omega = 2 * 3.14 * f;
+int A = 30 * 6 * 100; // [servoHornDeg]*[gearRatio]*[encorderResolution]
+double f = 1.0;       //[Hz]
+double omega = 2 * 3.14 * f;
 int64_t present_pos = 0;
-int angle = 0;
-int pos_buf = 0;
-int vel = 0;
+int64_t pos_buf = 0;
+int32_t vel = 0;
 
 void init_can();
 void write_can();
@@ -71,34 +71,6 @@ void loop()
     while (millis() - timer[0] < ENDTIME)
     {
         timer[1] = millis();
-        int32_t tgt_cur = -KP * (angle - TGT_POS) - KD*vel;
-
-        // M5.Lcd.clear();
-
-        // current control command
-        cmd_buf[0] = 0xA1;
-        cmd_buf[1] = 0x00;
-        cmd_buf[2] = 0x00;
-        cmd_buf[3] = 0x00;
-        cmd_buf[4] = tgt_cur & 0xFF;
-        cmd_buf[5] = (tgt_cur >> 8) & 0xFF;
-        cmd_buf[6] = 0x00;
-        cmd_buf[7] = 0x00;
-        write_can();
-        delay(1);
-        read_can();
-//        delay(100);
-
-        // print
-        SERIAL.print("TIM: ");
-        SERIAL.print(timer[1] - timer[0]);
-        SERIAL.print(" TGT: ");
-        SERIAL.print(tgt_cur);
-
-        for(int i=0;i++;i<8){
-          reply_buf[i]=0x00;
-        }
-        
         // read multi turn angle
         cmd_buf[0] = 0x92;
         cmd_buf[1] = 0x00;
@@ -109,47 +81,45 @@ void loop()
         cmd_buf[6] = 0x00;
         cmd_buf[7] = 0x00;
         write_can();
-        delay(1);
         read_can();
-//        delay(100);
 
         M5.update();
 
-        pos_buf = angle;
+        pos_buf = present_pos;
         present_pos = 0;
-        if (reply_buf[0] == 0x92){
-//          Serial.println(" Angle Reply");
-          present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 48);
-        }else if(reply_buf[0] == 0xA1)
-          Serial.print(" Error! PosCmd Reply");
-        else{
-          Serial.print(" Read Error!");
-        }
-        angle = present_pos * 0.01 / 6;
-        vel = (angle - pos_buf)/(LOOPTIME*0.01);
-        
-        Serial.print(" POS: ");
-        Serial.print(angle);
-        Serial.print(" VEL: ");
-        Serial.print(vel);
-        Serial.println();
+        // for (int i = 0; i < 7; i++)
+        // {
+        //   present_pos = present_pos + (reply_buf[i+1] << (8*i));
+        // }
+        present_pos = reply_buf[1] + (reply_buf[2] << 8) + (reply_buf[3] << 16) + (reply_buf[4] << 24) + (reply_buf[5] << 32) + (reply_buf[6] << 48);
+        int32_t horn_pos = present_pos * 0.01 / 6;
+        vel = (present_pos - pos_buf)/(LOOPTIME*0.01);
 
-//        M5.Lcd.setCursor(0, 40);
-//        M5.Lcd.printf("TIM:            ");
-//        M5.Lcd.setCursor(0, 40);
-//        M5.Lcd.printf("TIM: %d", timer[1] - timer[0]);
-//        M5.Lcd.setCursor(0, 70);
-//        M5.Lcd.printf("TGT:            ");
-//        M5.Lcd.setCursor(0, 70);
-//        M5.Lcd.printf("TGT: %d", tgt_cur);
-//        M5.Lcd.setCursor(0, 100);
-//        M5.Lcd.printf("POS:            ");
-//        M5.Lcd.setCursor(0, 100);
-//        M5.Lcd.printf("POS: %d", present_pos);
-//        M5.Lcd.setCursor(0, 130);
-//        M5.Lcd.printf("VEL:            ");
-//        M5.Lcd.setCursor(0, 130);
-//        M5.Lcd.printf("VEL: %d", vel);
+        // byteならこっち
+        // serialDisp(rmd.reply_buf, rmd.pos_buf);
+
+        // 10進数ならこっち
+        // SERIAL.print(",");
+        // SERIAL.print(present_pos);
+        // int tgt_angle = tgt_pos * 0.01 / 6;
+        M5.Lcd.setCursor(0, 40);
+        M5.Lcd.printf("TIM:            ");
+        M5.Lcd.setCursor(0, 40);
+        M5.Lcd.printf("TIM: %d", timer[1] - timer[0]);
+        M5.Lcd.setCursor(0, 70);
+        M5.Lcd.printf("POS:            ");
+        M5.Lcd.setCursor(0, 70);
+        M5.Lcd.printf("POS: %d", present_pos);
+        M5.Lcd.setCursor(0, 100);
+        M5.Lcd.printf("HRN:            ");
+        M5.Lcd.setCursor(0, 100);
+        M5.Lcd.printf("HRN: %d", horn_pos);
+        M5.Lcd.setCursor(0, 130);
+        M5.Lcd.printf("VEL:            ");
+        M5.Lcd.setCursor(0, 130);
+        M5.Lcd.printf("VEL: %d", vel);
+
+        // rmd.serialWriteTerminator();
 
         timer[2] = millis() - timer[1];
         if (timer[2] < LOOPTIME)
@@ -158,8 +128,6 @@ void loop()
         }
         else
         {
-             Serial.print("TIME SHORTAGE: ");
-             Serial.println(timer[2]-LOOPTIME);
             // M5.Lcd.printf("TIME SHORTAGE: %d\n", LOOPTIME - timer[2]);
         }
     }
@@ -190,10 +158,6 @@ void init_can()
     M5.Lcd.setTextSize(TEXTSIZE);
     M5.Lcd.setCursor(0, 10);
     M5.Lcd.printf("CAN Test!\n");
-    M5.Lcd.setCursor(0, 40);
-    M5.Lcd.printf("KP: %4.2f", KP);
-    M5.Lcd.setCursor(0, 70);
-    M5.Lcd.printf("KD: %4.2f", KD);
 
     // Initialize MCP2515 running at 16MHz with a baudrate of 500kb/s and the masks and filters disabled.
     if (CAN0.begin(MCP_ANY, CAN_1000KBPS, MCP_8MHZ) == CAN_OK)
@@ -214,7 +178,7 @@ void write_can()
     byte sndStat = CAN0.sendMsgBuf(MOTOR_ADDRESS, 0, 8, cmd_buf);
     if (sndStat == CAN_OK)
     {
-//        Serial.println("Message Sent Successfully!");
+        Serial.println("Message Sent Successfully!");
         // M5.Lcd.printf("Message Sent Successfully!\n");
     }
     else
@@ -230,35 +194,35 @@ void read_can()
     {
         CAN0.readMsgBuf(&rxId, &len, reply_buf); // Read data: len = data length, buf = data byte(s)
 
-//        if ((rxId & 0x80000000) == 0x80000000) // Determine if ID is standard (11 bits) or extended (29 bits)
-//        {
-//            sprintf(msgString, "Extended ID: 0x%.8lX  DLC: %1d \n Data:", (rxId & 0x1FFFFFFF), len);
-//        }
-//        else
-//        {
-//            sprintf(msgString, "Standard ID: 0x%.3lX       DLC: %1d \n Data:", rxId, len);
-//        }
-//
-//        Serial.print(msgString);
-//        // M5.Lcd.printf(msgString);
-//
-//        if ((rxId & 0x40000000) == 0x40000000)
-//        { // Determine if message is a remote request frame.
-//            sprintf(msgString, " REMOTE REQUEST FRAME");
-//            Serial.print(msgString);
-//        }
-//        else
-//        {
-//            for (byte i = 0; i < len; i++)
-//            {
-//                sprintf(msgString, " 0x%.2X", reply_buf[i]);
-//                Serial.print(msgString);
-//                // M5.Lcd.printf(msgString);
-//            }
-//        }
-//
-//        // M5.Lcd.printf("\n");
-//        Serial.println();
+        if ((rxId & 0x80000000) == 0x80000000) // Determine if ID is standard (11 bits) or extended (29 bits)
+        {
+            sprintf(msgString, "Extended ID: 0x%.8lX  DLC: %1d \n Data:", (rxId & 0x1FFFFFFF), len);
+        }
+        else
+        {
+            sprintf(msgString, "Standard ID: 0x%.3lX       DLC: %1d \n Data:", rxId, len);
+        }
+
+        Serial.print(msgString);
+        // M5.Lcd.printf(msgString);
+
+        if ((rxId & 0x40000000) == 0x40000000)
+        { // Determine if message is a remote request frame.
+            sprintf(msgString, " REMOTE REQUEST FRAME");
+            Serial.print(msgString);
+        }
+        else
+        {
+            for (byte i = 0; i < len; i++)
+            {
+                sprintf(msgString, " 0x%.2X", rxBuf[i]);
+                Serial.print(msgString);
+                // M5.Lcd.printf(msgString);
+            }
+        }
+
+        // M5.Lcd.printf("\n");
+        Serial.println();
     }
 }
 
