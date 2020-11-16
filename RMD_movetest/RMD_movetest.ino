@@ -69,12 +69,6 @@ void setup()
 
 void loop()
 {
-  // if (M5.BtnA.wasPressed())
-  // {
-  //   M5.Lcd.clear();
-  //   M5.Lcd.printf("CAN Test B!\n");
-  //   init_can();
-  // }
   write_can();
   read_can();
   M5.update();

@@ -87,7 +87,6 @@ void loop()
         write_can();
         delay(1);
         read_can();
-//        delay(100);
 
         // print
         SERIAL.print("TIM: ");
@@ -98,7 +97,7 @@ void loop()
         for(int i=0;i++;i<8){
           reply_buf[i]=0x00;
         }
-        
+
         // read multi turn angle
         cmd_buf[0] = 0x92;
         cmd_buf[1] = 0x00;
@@ -111,7 +110,6 @@ void loop()
         write_can();
         delay(1);
         read_can();
-//        delay(100);
 
         M5.update();
 
@@ -127,7 +125,7 @@ void loop()
         }
         angle = present_pos * 0.01 / 6;
         vel = (angle - pos_buf)/(LOOPTIME*0.01);
-        
+
         Serial.print(" POS: ");
         Serial.print(angle);
         Serial.print(" VEL: ");
