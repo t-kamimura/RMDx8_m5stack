@@ -6,7 +6,7 @@
 #define LOOPTIME 5  //[ms]
 #define TEXTSIZE 1
 
-int pos =0;
+int pos = 0;
 unsigned char len = 0;
 unsigned char cmd_buf[8], reply_buf[8];
 unsigned long timer[3];

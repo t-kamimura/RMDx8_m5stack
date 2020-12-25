@@ -1,4 +1,4 @@
-/* 電流制御テスト */
+/* CAN通信テスト */
 #include <M5Stack.h>
 #include <mcp_can_m5.h>
 #include <SPI.h>
