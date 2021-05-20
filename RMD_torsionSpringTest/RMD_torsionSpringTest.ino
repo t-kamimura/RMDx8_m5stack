@@ -1,4 +1,6 @@
-/* CAN通信テスト */
+/* 回転ばねテスト */
+/* RMDX8クラスを使用する */
+
 #include <M5Stack.h>
 #include <mcp_can_m5.h>
 #include <SPI.h>
@@ -6,39 +8,30 @@
 
 /*SAMD core*/
 #ifdef ARDUINO_SAMD_VARIANT_COMPLIANCE
-#define SERIAL serialUSB
+#define SERIAL SERIALUSB
 #else
 #define SERIAL Serial
 #endif
 
 #define BAUDRATE 115200 //シリアル通信がボトルネックにならないよう，速めに設定しておく
-#define LOOPTIME 10     //[ms]
+#define LOOPTIME 5     //[ms]
 #define ENDTIME 10000   //[ms]
 #define TEXTSIZE 2
-#define KP 0.5
-#define KD 0.2
+#define KP 2.0
+#define KD 0.10
 #define TGT_POS 0
 
-// unsigned char len = 0;
-// unsigned char cmd_buf[8], reply_buf[8];
-// long unsigned int rxId;
-// unsigned char rxBuf[8];
-// char msgString[128];
 unsigned long timer[3];
-// byte pos_byte[4];
 
-const uint16_t MOTOR_ADDRESS_1 = 0x141; //0x140 + ID(1~32)
-const uint16_t MOTOR_ADDRESS_2 = 0x143; //0x140 + ID(1~32)
+const uint16_t MOTOR_ADDRESS = 0x141; //0x140 + ID(1~32)
 const int SPI_CS_PIN = 12;
 
 #define CAN0_INT 15          // Set INT to pin 2
 MCP_CAN_M5 CAN0(SPI_CS_PIN); // Set CS to pin 10
-RMDX8_M5 myMotor1(CAN0, MOTOR_ADDRESS_1);
-RMDX8_M5 myMotor2(CAN0, MOTOR_ADDRESS_2);
+RMDX8_M5 myMotor(CAN0, MOTOR_ADDRESS);
 
-int A = 5 * 6 * 100; // (servoHornDeg)*(gearRatio)*(encorderResolution)
-double f = 1.0;       // [Hz]
-double omega = 2 * 3.14 * f;
+double initial_pos, previous_pos, present_vel;
+int32_t target_cur;
 
 void init_can();
 
@@ -46,17 +39,18 @@ void setup()
 {
     M5.begin();
     M5.Power.begin();
-    Serial.begin(BAUDRATE);
+    SERIAL.begin(BAUDRATE);
     delay(1000);
     M5.Lcd.fillScreen(BLACK);
     M5.Lcd.setTextColor(GREEN, BLACK);
     M5.Lcd.setTextSize(TEXTSIZE);
 
     init_can();
-    Serial.println("Test CAN...");
+    SERIAL.println("Test CAN...");
     timer[0] = millis();
 
-    myMotor1.readPosition();
+    myMotor.readPosition();
+    initial_pos = myMotor.present_angle;
 }
 
 void loop()
@@ -64,24 +58,24 @@ void loop()
     while (millis() - timer[0] < ENDTIME)
     {
         timer[1] = millis();
-        int32_t tgt_pos = A * sin(omega * (timer[1] - timer[0]) * 0.001);
 
         // read multi turn angle
-        // pos_buf = myMotor2.present_pos;
-        myMotor1.readPosition();
+        previous_pos = myMotor.present_angle;
+        myMotor.readPosition();
         delay(1);
-        myMotor2.readPosition();
-        delay(1);
-        myMotor1.writePosition(tgt_pos);
-        delay(1);
-        myMotor2.writePosition(-tgt_pos);
+
+        // int32_t tgt_pos = A * sin(omega * (timer[1] - timer[0]) * 0.001);
+        present_vel = (myMotor.present_angle - previous_pos)*1000/LOOPTIME;
+        int32_t target_cur = - KP*(myMotor.present_angle - initial_pos) - KD * present_vel;
+
+        myMotor.writeCurrent(target_cur);
         delay(1);
 
         M5.update();
 
         // vel = (myMotor2.present_pos - pos_buf)/(LOOPTIME*0.01);
 
-        // DEBUG(この処理重いので注意)
+        // Debug (M5モニタ)(この処理重いので注意)
         // M5.Lcd.setCursor(0, 40);
         // M5.Lcd.printf("TIM:            ");
         // M5.Lcd.setCursor(0, 40);
@@ -98,20 +92,19 @@ void loop()
         // M5.Lcd.printf("VEL:            ");
         // M5.Lcd.setCursor(0, 130);
         // M5.Lcd.printf("VEL: %d", vel);
-        Serial.print("TIM: ");
-        Serial.print(timer[1] - timer[0]);
-        // Serial.print(" POS: ");
-        // Serial.print(myMotor1.present_pos);
 
-        // Serial.print(" TGT: ");
-        // Serial.print(tgt_pos);
-
-        Serial.print(" HRN1: ");
-        Serial.print(myMotor1.present_angle);
-        Serial.print(" HRN2: ");
-        Serial.print(myMotor2.present_angle);
-        Serial.println("");
-
+        // Debug (SERIAL)
+        SERIAL.print("TIM: ");
+        SERIAL.print(timer[1] - timer[0]);
+        SERIAL.print(" TGT: ");
+        SERIAL.print(initial_pos);
+        SERIAL.print(" POS: ");
+        SERIAL.print(myMotor.present_angle);
+        SERIAL.print(" VEL: ");
+        SERIAL.print(present_vel);
+        SERIAL.print(" CUR: ");
+        SERIAL.print(target_cur);
+        SERIAL.println("");
 
         timer[2] = millis() - timer[1];
         if (timer[2] < LOOPTIME)
@@ -125,11 +118,11 @@ void loop()
             // M5.Lcd.printf("TIME SHORTAGE: %d\n", LOOPTIME - timer[2]);
         }
     }
-
+    // finishing
+    myMotor.writePosition(0);
+    delay(2000);
     // stop command
-    myMotor1.stop();
-    delay(1);
-    myMotor2.stop();
+    myMotor.stop();
     delay(500);
     SERIAL.println("Program finish!");
     M5.Lcd.setCursor(0, 160);
@@ -149,11 +142,11 @@ void init_can()
     // Initialize MCP2515 running at 16MHz with a baudrate of 500kb/s and the masks and filters disabled.
     if (CAN0.begin(MCP_ANY, CAN_1000KBPS, MCP_8MHZ) == CAN_OK)
     {
-        Serial.println("MCP2515 Initialized Successfully!");
+        SERIAL.println("MCP2515 Initialized Successfully!");
     }
     else
     {
-        Serial.println("Error Initializing MCP2515...");
+        SERIAL.println("Error Initializing MCP2515...");
     }
 
     CAN0.setMode(MCP_NORMAL); // Change to normal mode to allow messages to be transmitted
